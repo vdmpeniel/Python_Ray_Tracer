@@ -22,4 +22,7 @@ class Sphere:
                 return distance
         return None
 
+    def normal(self, surface_point):
+        """Returns surface normal to a point on the sphere's surface"""
+        return (surface_point - self.center).normalize()
 

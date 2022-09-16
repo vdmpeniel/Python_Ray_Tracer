@@ -14,19 +14,26 @@ from point import Point
 from sphere import Sphere
 from scene import Scene
 from engine import RenderEngine
-
+from light import Light
+from material import Material
+import argparse
 
 
 def main():
-    WIDTH = 320
-    HEIGHT = 200
+    parser = argparse.ArgumentParser()
+    parser.add_argument('imageout', help='Path to rendered image')
+    args = parser.parse_args()
+
+    WIDTH = 1024
+    HEIGHT = 720
     camera = Vector(0, 0, -1)
-    objects = [Sphere(Point(0, 0, 0), 0.2, Color.from_hex('#FF0000'))]
-    scene = Scene(camera, objects, WIDTH, HEIGHT)
+    objects = [Sphere(Point(0, 0, 0), 0.2, Material(Color.from_hex('#FF0000')))]
+    lights = [Light(Point(3, -8, -10.0), Color.from_hex('#FFFFFF'))]
+    scene = Scene(camera, objects, lights, WIDTH, HEIGHT)
     engine = RenderEngine()
     image = engine.render(scene)
 
-    with open('test.ppm', 'w') as img_file:
+    with open(args.imageout, 'w') as img_file:
         image.write_ppm(img_file)
 
 
