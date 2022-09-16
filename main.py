@@ -9,23 +9,22 @@
 """
 from image import Image
 from color import Color
+from vector import Vector
+from point import Point
+from sphere import Sphere
+from scene import Scene
+from engine import RenderEngine
+
 
 
 def main():
-    WIDTH = 3
-    HEIGHT = 2
-    image = Image(WIDTH, HEIGHT)
-    red = Color(1, 0, 0)
-    green = Color(0, 1, 0)
-    blue = Color(0, 0, 1)
-
-    image.set_pixel(0, 0, red)
-    image.set_pixel(1, 0, green)
-    image.set_pixel(2, 0, blue)
-
-    image.set_pixel(0, 1, red + green)
-    image.set_pixel(1, 1, red + blue + green)
-    image.set_pixel(2, 1, red * 0.001)
+    WIDTH = 320
+    HEIGHT = 200
+    camera = Vector(0, 0, -1)
+    objects = [Sphere(Point(0, 0, 0), 0.2, Color.from_hex('#FF0000'))]
+    scene = Scene(camera, objects, WIDTH, HEIGHT)
+    engine = RenderEngine()
+    image = engine.render(scene)
 
     with open('test.ppm', 'w') as img_file:
         image.write_ppm(img_file)

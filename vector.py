@@ -43,11 +43,11 @@ class Vector:
         )
 
     def dot_product(self, other):
-        return self.x * other.x + self.y * other.x + self.z * other.z
+        return self.x * other.x + self.y * other.y + self.z * other.z
 
     def magnitude(self):
         return math.sqrt(self.dot_product(self))
 
     def normalize(self):
-        return self / self.magnitude
+        return self / self.magnitude()
 
