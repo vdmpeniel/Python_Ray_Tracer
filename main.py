@@ -7,6 +7,8 @@
 """ A Pure Python Raytracer by Victor Diaz, 2022,
     based on Arun Ravidran video series
 """
+import os.path
+
 from image import Image
 from color import Color
 from vector import Vector
@@ -17,23 +19,21 @@ from engine import RenderEngine
 from light import Light
 from material import Material
 import argparse
+import importlib
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('imageout', help='Path to rendered image')
+    parser.add_argument('scene', help='Path to the scene file (without the .py extension)')
     args = parser.parse_args()
+    mod = importlib.import_module(args.scene)
 
-    WIDTH = 1024
-    HEIGHT = 720
-    camera = Vector(0, 0, -1)
-    objects = [Sphere(Point(0, 0, 0), 0.2, Material(Color.from_hex('#FF0000')))]
-    lights = [Light(Point(3, -8, -10.0), Color.from_hex('#FFFFFF'))]
-    scene = Scene(camera, objects, lights, WIDTH, HEIGHT)
+    scene = Scene(mod.CAMERA, mod.OBJECTS, mod.LIGHTS, mod.WIDTH, mod.HEIGHT)
     engine = RenderEngine()
     image = engine.render(scene)
 
-    with open(args.imageout, 'w') as img_file:
+    os.chdir(os.path.dirname(os.path.abspath(mod.__file__)))
+    with open(mod.RENDERED_IMG, 'w') as img_file:
         image.write_ppm(img_file)
 
 
