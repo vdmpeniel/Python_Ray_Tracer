@@ -3,6 +3,10 @@ from ray import Ray
 from point import Point
 from color import Color
 import time
+import tempfile
+import shutil
+from pathlib import Path
+from multiprocessing import Value, Process
 
 
 class RenderEngine:
@@ -10,7 +14,53 @@ class RenderEngine:
     MAX_DEPTH = 5
     MIN_DISPLACE = 0.0001
 
-    def render(self, scene):
+    def render_multiprocess(self, scene, process_count, img_file_obj):
+        def split_range(count, parts):
+            d, r = divmod(count, parts)
+            return [
+                (i * d + min(i, r), (i + 1) * d + min(i + 1, r)) for i in range(parts)
+            ]
+
+        start_time = time.time()
+        width = scene.width
+        height = scene.height
+        ranges = split_range(height, process_count)
+
+        temp_dir = Path(tempfile.mkdtemp())
+        temp_file_tmpl = 'puray-part-{}.temp'
+        processes = []
+        try:
+            rows_done = Value('i', 0)
+            for hmin, hmax in ranges:
+                part_file = temp_dir / temp_file_tmpl.format(hmin)
+                processes.append(Process(
+                    target=self.render,
+                    args=(scene, hmin, hmax, part_file, rows_done))
+                )
+
+            # Start all the processes
+            for process in processes:
+                process.start()
+
+            # Wait until all processes finish
+            for process in processes:
+                process.join()
+
+            # Construct the image with all rendered parts
+            Image.write_ppm_header(img_file_obj, height=height, width=width)
+            for hmin, _ in ranges:
+                part_file = temp_dir / temp_file_tmpl.format(hmin)
+                img_file_obj.write(open(part_file, "r").read())
+        except Exception as e:
+            print(f'There was a error: {repr(e)}')
+        finally:
+            shutil.rmtree(temp_dir)
+
+        end_time = time.time()
+        print('Elapsed Time: {} seconds'.format(end_time - start_time))
+        print('Done.')
+
+    def render(self, scene, hmin, hmax, part_file, rows_done):
         width = scene.width
         height = scene.height
         aspect_ratio = float(width) / height
@@ -23,21 +73,26 @@ class RenderEngine:
         y_step = (y1 - y0) / (height - 1)
 
         camera = scene.camera
-        image = Image(width, height)
+        image = Image(width, hmax - hmin)
 
-        start_time = time.time()
-        for j in range(height):
+
+        for j in range(hmin, hmax):
             y = y0 + j * y_step
             for i in range(width):
                 x = x0 + i * x_step
                 ray = Ray(camera, Point(x, y) - camera)
-                image.set_pixel(i, j, self.ray_trace(ray, scene))
-            print('{:3.0f}%'.format(float(j) / float(height) * 100), end='\r')
+                image.set_pixel(i, j - hmin, self.ray_trace(ray, scene))
 
-        end_time = time.time()
-        print('Elapsed Time: {} seconds'.format(end_time - start_time))
-        print('Done.')
-        return image
+                # avoiding a race condition when updating progress bar
+            if rows_done:
+                with rows_done.get_lock():
+                    rows_done.value += 1
+                    print('[{:3.0f}%]'.format(float(rows_done.value) / float(height) * 100), end='\r')
+
+        with open(part_file, 'w') as part_file_obj:
+            image.write_ppm_raw(part_file_obj)
+
+
 
     def ray_trace(self, ray, scene, depth=0):
         color = Color(0, 0, 0)
@@ -85,9 +140,9 @@ class RenderEngine:
 
             # diffuse shading (Lambert)
             color += (
-                     obj_color
-                     * material.diffuse
-                     * max(normal.dot_product(to_light.direction), 0)
+                    obj_color
+                    * material.diffuse
+                    * max(normal.dot_product(to_light.direction), 0)
             )
             # Specular shading (Blinn-Phong)
             half_vector = (to_light.direction + to_cam).normalize()
